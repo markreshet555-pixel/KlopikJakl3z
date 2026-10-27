@@ -1,1 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ken Kaneki // Number Guessing Terminal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Anime/Terminal Aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=JetBrains+Mono:wght@400;600;800&family=Orbitron:wght@500;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ghoulRed: '#ff0033',
+                        ghoulDarkRed: '#88001b',
+                        ghoulBlack: '#0a0a0c',
+                        ghoulPanel: 'rgba(12, 12, 16, 0.85)',
+                    },
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                        ghoul: ['"Cinzel"', 'serif'],
+                        tech: ['"Orbitron"', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        ghoulGlow: '0 0 25px rgba(255, 0, 51, 0.4)',
+                        ghoulGlowSubtle: '0 0 15px rgba(255, 0, 51, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Background Wallpaper setup with fallback */
+        body {
+            background: #000 url('1920x1080.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: hidden;
+        }
 
+        /* Glassmorphism Panel */
+        .ghoul-card {
+            background: rgba(10, 10, 14, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 0, 51, 0.3);
+        }
+
+        /* Custom Centipede Canvas Overlay */
+        #centipedeCanvas {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0c;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ff0033;
+            border-radius: 3px;
+        }
+
+        /* Red neon animation */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 0, 51, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(255, 0, 51, 0.7); }
+        }
+        .pulse-border {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+
+        .glitch-text {
+            text-shadow: 2px 0 #ff0033, -2px 0 #00ffff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-6 relative">
+
+    <!-- Centipede Canvas (Interactive / Animated side crawler) -->
+    <canvas id="centipedeCanvas"></canvas>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-4xl relative z-30">
+        
+        <!-- Header Banner -->
+        <header class="mb-6 text-center">
+            <h1 class="font-ghoul text-4xl sm:text-5xl font-extrabold tracking-widest text-white uppercase mb-2 drop-shadow-[0_4px_10px_rgba(255,0,51,0.8)]">
+                KANEKI // <span class="text-ghoulRed">1000 - 7 = ?</span>
+            </h1>
+            <p class="text-xs sm:text-sm text-gray-400 font-tech tracking-wider uppercase">
+                Number Guessing Protocol &bull; Tokyo Ghoul Edition
+            </p>
+        </header>
+
+        <!-- Main Game Card -->
+        <div class="ghoul-card rounded-2xl p-5 sm:p-8 shadow-2xl pulse-border relative overflow-hidden">
+            
+            <!-- Decorative Accent line -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-ghoulRed to-transparent"></div>
+
+            <!-- STEP 1: Nickname Entry -->
+            <div id="step-nickname" class="space-y-6">
+                <div class="text-center space-y-2">
+                    <h2 class="text-2xl font-tech text-white font-bold">IDENTIFY YOURSELF</h2>
+                    <p class="text-sm text-gray-400">Enter your Steam nickname to sync your record to the ghoul database.</p>
+                </div>
+                
+                <form id="form-nickname" onsubmit="submitNickname(event)" class="max-w-md mx-auto space-y-4">
+                    <div>
+                        <label for="input-nickname" class="block text-xs font-mono uppercase text-ghoulRed mb-1">Steam Nickname</label>
+                        <input type="text" id="input-nickname" required placeholder="e.g. Eyepatch_30" 
+                            class="w-full bg-black/60 border border-ghoulRed/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-ghoulRed focus:ring-1 focus:ring-ghoulRed transition duration-200">
+                    </div>
+                    <button type="submit" 
+                        class="w-full bg-ghoulRed hover:bg-ghoulDarkRed text-white font-tech uppercase py-3 rounded-xl font-bold tracking-wider shadow-ghoulGlow hover:shadow-none transition duration-200 active:scale-95">
+                        Initialize Protocol
+                    </button>
+                </form>
+            </div>
+
+            <!-- STEP 2: Level Selection -->
+            <div id="step-level" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row justify-between items-center border-b border-gray-800 pb-4 gap-2">
+                    <div>
+                        <span class="text-xs text-gray-400 block uppercase">Operative</span>
+                        <span id="display-player-name" class="text-lg font-bold text-ghoulRed font-tech">NAME</span>
+                    </div>
+                    <button onclick="resetPlayer()" class="text-xs text-gray-500 hover:text-white underline">Change Nickname</button>
+                </div>
+
+                <div class="text-center">
+                    <h2 class="text-xl font-tech text-white font-bold mb-1">SELECT DIFFICULTY LEVEL</h2>
+                    <p class="text-xs text-gray-400">Higher levels grant higher limits. Choose wisely.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="level-buttons-container">
+                    <!-- Javascript will populate level buttons dynamically -->
+                </div>
+            </div>
+
+            <!-- STEP 3: Active Guessing Game -->
+            <div id="step-game" class="hidden space-y-6">
+                <!-- Status Header -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/50 p-4 rounded-xl border border-gray-800 text-center">
+                    <div>
+                        <span class="block text-[10px] text-gray-400 uppercase">Selected Level</span>
+                        <span id="game-level-num" class="text-base font-bold text-white font-tech">LVL 1</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-gray-400 uppercase">Target Range</span>
+                        <span id="game-range" class="text-base font-bold text-ghoulRed font-tech">1 - 10</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-gray-400 uppercase">Attempts Left</span>
+                        <span id="game-attempts-left" class="text-base font-bold text-yellow-400 font-tech">5</span>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] text-gray-400 uppercase">Best Score</span>
+                        <span id="game-best-score" class="text-base font-bold text-green-400 font-tech">--</span>
+                    </div>
+                </div>
+
+                <!-- Feedback Terminal -->
+                <div id="game-feedback-box" class="min-h-[90px] bg-black/80 border border-gray-800 rounded-xl p-4 flex flex-col justify-center items-center text-center">
+                    <p id="game-feedback-text" class="text-lg font-semibold text-gray-200">
+                        Enter your first guess below...
+                    </p>
+                </div>
+
+                <!-- Input Box -->
+                <form id="form-guess" onsubmit="submitGuess(event)" class="max-w-md mx-auto space-y-4">
+                    <div class="relative">
+                        <input type="number" id="input-guess" required placeholder="Enter a number..." 
+                            class="w-full bg-black/80 border-2 border-ghoulRed/70 rounded-xl px-4 py-3.5 text-center text-xl font-bold text-white focus:outline-none focus:border-ghoulRed focus:ring-2 focus:ring-ghoulRed transition duration-200">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="submit" id="btn-submit-guess" 
+                            class="flex-1 bg-ghoulRed hover:bg-ghoulDarkRed text-white font-tech uppercase py-3.5 rounded-xl font-bold tracking-wider shadow-ghoulGlow hover:shadow-none transition duration-200 active:scale-95">
+                            Submit Guess
+                        </button>
+                        <button type="button" onclick="giveUpGame()" 
+                            class="px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 font-tech text-xs uppercase rounded-xl transition">
+                            Forfeit
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- STEP 4: Game Over / Victory Modal View -->
+            <div id="step-result" class="hidden space-y-6 text-center">
+                <div id="result-icon-box" class="text-6xl mb-2">
+                    <!-- Icon populated dynamically -->
+                </div>
+                <h2 id="result-title" class="text-3xl font-ghoul font-bold tracking-wider">RESULT</h2>
+                <p id="result-message" class="text-gray-300 max-w-md mx-auto text-sm sm:text-base"></p>
+
+                <div class="pt-4 flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="restartSameLevel()" 
+                        class="bg-ghoulRed hover:bg-ghoulDarkRed text-white font-tech uppercase px-6 py-3 rounded-xl font-bold shadow-ghoulGlow transition">
+                        Play Again (Same Level)
+                    </button>
+                    <button onclick="goToLevelSelect()" 
+                        class="bg-gray-800 hover:bg-gray-700 text-gray-200 font-tech uppercase px-6 py-3 rounded-xl transition">
+                        Choose Level
+                    </button>
+                </div>
+            </div>
+
+            <!-- LEADERBOARD SECTION -->
+            <div class="mt-8 pt-6 border-t border-gray-800/80">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-tech text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-ghoulRed inline-block"></span>
+                        Leaderboard Records
+                    </h3>
+                    <button onclick="clearLeaderboard()" class="text-[11px] text-gray-500 hover:text-red-400 transition">
+                        Clear History
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="bg-black/60 uppercase text-[10px] text-gray-400 font-tech">
+                            <tr>
+                                <th class="p-2.5 rounded-l-lg">Player</th>
+                                <th class="p-2.5">Level</th>
+                                <th class="p-2.5">Attempts</th>
+                                <th class="p-2.5 rounded-r-lg">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body" class="divide-y divide-gray-800/50 font-mono">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JS Game Logic & Centipede Animation -->
+    <script>
+        // --- GAME STATE VARIABLES ---
+        const levels = [10, 20, 50, 100, 200, 500, 1000];
+        const maxAttemptsList = [5, 5, 5, 10, 20, 50, 100];
+        const STORAGE_KEY = "kaneki_ghoul_leaderboard_v1";
+
+        let currentName = "";
+        let currentLevelIdx = 0;
+        let secretNum = 0;
+        let attemptsUsed = 0;
+        let maxAttempts = 0;
+        let bestScore = null;
+        let leaderboard = [];
+
+        // --- INIT & PERSISTENCE ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadLeaderboard();
+            renderLeaderboard();
+            initCentipedeCanvas();
+        });
+
+        function loadLeaderboard() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    leaderboard = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error("Failed to load leaderboard", e);
+                leaderboard = [];
+            }
+        }
+
+        function saveLeaderboard() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+            } catch (e) {
+                console.error("Failed to save leaderboard", e);
+            }
+            renderLeaderboard();
+        }
+
+        function clearLeaderboard() {
+            if (confirm("Are you sure you want to clear all game history?")) {
+                leaderboard = [];
+                saveLeaderboard();
+            }
+        }
+
+        // --- STEP NAVIGATION ---
+        function showStep(stepId) {
+            ['step-nickname', 'step-level', 'step-game', 'step-result'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(stepId).classList.remove('hidden');
+        }
+
+        function submitNickname(e) {
+            e.preventDefault();
+            const input = document.getElementById('input-nickname').value.trim();
+            if (!input) return;
+            currentName = input;
+            document.getElementById('display-player-name').innerText = currentName;
+            
+            buildLevelButtons();
+            showStep('step-level');
+        }
+
+        function resetPlayer() {
+            showStep('step-nickname');
+        }
+
+        function buildLevelButtons() {
+            const container = document.getElementById('level-buttons-container');
+            container.innerHTML = '';
+
+            levels.forEach((maxVal, idx) => {
+                const attempts = maxAttemptsList[idx];
+                const btn = document.createElement('button');
+                btn.className = "bg-black/60 hover:bg-ghoulRed/20 border border-gray-800 hover:border-ghoulRed p-3.5 rounded-xl text-left transition duration-200 group relative overflow-hidden";
+                btn.onclick = () => startLevel(idx);
+                btn.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-tech text-sm font-bold text-white group-hover:text-ghoulRed">LVL ${idx + 1}</span>
+                        <span class="text-[10px] text-gray-400 font-mono">1 - ${maxVal}</span>
+                    </div>
+                    <div class="text-xs text-gray-400">Max Attempts: <span class="text-yellow-400 font-bold">${attempts}</span></div>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        // --- GAMEPLAY LOGIC ---
+        function startLevel(idx) {
+            currentLevelIdx = idx;
+            const maxVal = levels[idx];
+            maxAttempts = maxAttemptsList[idx];
+            secretNum = Math.floor(Math.random() * maxVal) + 1;
+            attemptsUsed = 0;
+
+            document.getElementById('game-level-num').innerText = `LVL ${idx + 1}`;
+            document.getElementById('game-range').innerText = `1 - ${maxVal}`;
+            document.getElementById('game-attempts-left').innerText = maxAttempts;
+            document.getElementById('game-best-score').innerText = bestScore !== null ? `${bestScore} attempts` : '--';
+
+            document.getElementById('game-feedback-text').className = "text-lg font-semibold text-gray-200";
+            document.getElementById('game-feedback-text').innerText = `Game started! Guess a number between 1 and ${maxVal}.`;
+
+            document.getElementById('input-guess').value = '';
+            document.getElementById('input-guess').focus();
+
+            showStep('step-game');
+        }
+
+        function submitGuess(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('input-guess');
+            const guess = parseInt(inputEl.value, 10);
+            if (isNaN(guess)) return;
+
+            attemptsUsed++;
+            const attemptsLeft = maxAttempts - attemptsUsed;
+            document.getElementById('game-attempts-left').innerText = Math.max(0, attemptsLeft);
+
+            const feedbackEl = document.getElementById('game-feedback-text');
+
+            if (guess === secretNum) {
+                // WIN!
+                if (bestScore === null || attemptsUsed < bestScore) {
+                    bestScore = attemptsUsed;
+                }
+                recordGameResult("Won");
+                showResult(true, `Lucky man! You guessed the number ${secretNum} in ${attemptsUsed} attempt(s)!`);
+            } else if (attemptsUsed >= maxAttempts) {
+                // LOSE!
+                recordGameResult("Lost");
+                showResult(false, `GAME OVER! You ran out of attempts. The secret number was ${secretNum}.`);
+            } else {
+                // CONTINUE
+                if (guess < secretNum) {
+                    feedbackEl.innerText = "Too low! Try higher ⬆️";
+                    feedbackEl.className = "text-lg font-semibold text-blue-400 animate-pulse";
+                } else {
+                    feedbackEl.innerText = "Too high! Try lower ⬇️";
+                    feedbackEl.className = "text-lg font-semibold text-red-400 animate-pulse";
+                }
+                inputEl.value = '';
+                inputEl.focus();
+            }
+        }
+
+        function giveUpGame() {
+            if (confirm("Are you sure you want to forfeit this match?")) {
+                recordGameResult("Lost");
+                showResult(false, `Forfeited! The number was ${secretNum}.`);
+            }
+        }
+
+        function recordGameResult(status) {
+            leaderboard.unshift({
+                name: currentName,
+                level: currentLevelIdx + 1,
+                attempts: attemptsUsed,
+                status: status,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            saveLeaderboard();
+        }
+
+        function showResult(isWin, message) {
+            const iconBox = document.getElementById('result-icon-box');
+            const titleEl = document.getElementById('result-title');
+            const msgEl = document.getElementById('result-message');
+
+            if (isWin) {
+                iconBox.innerHTML = "🩸";
+                titleEl.innerText = "DOMINANCE ACHIEVED";
+                titleEl.className = "text-3xl font-ghoul font-bold tracking-wider text-ghoulRed glitch-text";
+            } else {
+                iconBox.innerHTML = "💀";
+                titleEl.innerText = "CONSUMED BY DARKNESS";
+                titleEl.className = "text-3xl font-ghoul font-bold tracking-wider text-gray-400";
+            }
+
+            msgEl.innerText = message;
+            showStep('step-result');
+        }
+
+        function restartSameLevel() {
+            startLevel(currentLevelIdx);
+        }
+
+        function goToLevelSelect() {
+            showStep('step-level');
+        }
+
+        function renderLeaderboard() {
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '';
+
+            if (leaderboard.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-gray-600">No matches recorded yet.</td></tr>`;
+                return;
+            }
+
+            leaderboard.slice(0, 8).forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-black/30 transition";
+                const isWon = entry.status === "Won";
+                tr.innerHTML = `
+                    <td class="p-2.5 font-bold text-white">${escapeHtml(entry.name)}</td>
+                    <td class="p-2.5 text-gray-400">LVL ${entry.level}</td>
+                    <td class="p-2.5 text-yellow-400">${entry.attempts}</td>
+                    <td class="p-2.5 font-bold ${isWon ? 'text-green-400' : 'text-red-500'}">${entry.status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // --- ANIMATED CENTIPEDE (MUKADE) CANVAS EFFECT ---
+        function initCentipedeCanvas() {
+            const canvas = document.getElementById('centipedeCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let width = canvas.width = window.innerWidth;
+            let height = canvas.height = window.innerHeight;
+
+            window.addEventListener('resize', () => {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            });
+
+            // Centipede procedural body segments
+            const segmentCount = 28;
+            const segments = [];
+            let headPos = { x: width * 0.85, y: height * 0.2 };
+            let angle = 0;
+            let speed = 2.5;
+
+            for (let i = 0; i < segmentCount; i++) {
+                segments.push({ x: headPos.x, y: headPos.y + i * 12 });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+
+                // Move head along a crawling sine path on right half of screen
+                angle += 0.02;
+                headPos.x += Math.sin(angle * 1.5) * 2;
+                headPos.y += Math.cos(angle) * speed;
+
+                // Loop top to bottom
+                if (headPos.y > height + 100) headPos.y = -100;
+                if (headPos.y < -100) headPos.y = height + 100;
+
+                segments[0].x = headPos.x;
+                segments[0].y = headPos.y;
+
+                // Update body segments following the head
+                for (let i = 1; i < segmentCount; i++) {
+                    const prev = segments[i - 1];
+                    const curr = segments[i];
+                    const dx = prev.x - curr.x;
+                    const dy = prev.y - curr.y;
+                    const dist = Math.hypot(dx, dy);
+                    const targetDist = 12;
+
+                    if (dist > targetDist) {
+                        const factor = (dist - targetDist) / dist;
+                        curr.x += dx * factor;
+                        curr.y += dy * factor;
+                    }
+                }
+
+                // Draw Legs & Segments
+                for (let i = segmentCount - 1; i >= 0; i--) {
+                    const seg = segments[i];
+                    const prev = segments[Math.max(0, i - 1)];
+                    const segAngle = Math.atan2(prev.y - seg.y, prev.x - seg.x);
+
+                    // Draw Legs
+                    ctx.save();
+                    ctx.translate(seg.x, seg.y);
+                    ctx.rotate(segAngle);
+
+                    const legLength = 18 + Math.sin(angle * 4 + i) * 6;
+                    ctx.strokeStyle = '#ff0033';
+                    ctx.lineWidth = 1.8;
+                    ctx.shadowColor = '#ff0033';
+                    ctx.shadowBlur = 8;
+
+                    // Left Leg
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-4, -legLength);
+                    ctx.stroke();
+
+                    // Right Leg
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-4, legLength);
+                    ctx.stroke();
+
+                    // Segment Body
+                    const radius = i === 0 ? 8 : (10 - (i / segmentCount) * 5);
+                    ctx.fillStyle = i === 0 ? '#ff0033' : '#111116';
+                    ctx.strokeStyle = '#ff0033';
+                    ctx.lineWidth = 1.2;
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, Math.max(3, radius), 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+    </script>
+</body>
+</html>
